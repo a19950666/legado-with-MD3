@@ -690,18 +690,18 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     /**
-     * 更新通知
+     * 更新通知 - 必须同步执行，Android 14+ 要求在 5 秒内调用 startForeground
      */
     override fun startForegroundNotification() {
-        execute {
-            try {
-                val notification = createNotification()
-                startForeground(NotificationId.ReadAloudService, notification.build())
-            } catch (e: Exception) {
-                AppLog.put("创建朗读通知出错,${e.localizedMessage}", e, true)
-                //创建通知出错不结束服务就会崩溃,服务必须绑定通知
-                stopSelf()
-            }
+        try {
+            val notification = createNotification()
+            // 同步启动前台服务，避免 Android 14+ 的 ANR 或崩溃
+            startForeground(NotificationId.ReadAloudService, notification.build())
+            AppLog.put("朗读服务前台通知已创建")
+        } catch (e: Exception) {
+            AppLog.put("创建朗读通知出错,${e.localizedMessage}", e, true)
+            //创建通知出错不结束服务就会崩溃,服务必须绑定通知
+            stopSelf()
         }
     }
 
