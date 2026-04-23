@@ -1,5 +1,6 @@
 package io.legado.app.base
 
+import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -24,6 +25,13 @@ abstract class BaseService : LifecycleService() {
 
     private val simpleName = this::class.simpleName.toString()
     private var isForeground = false
+
+    /**
+     * 是否在任务移除时停止服务
+     * 子类可重写此属性，如朗读服务需要保持后台运行时应返回 false
+     */
+    protected open val stopOnTaskRemoved: Boolean
+        get() = true
 
     fun <T> execute(
         scope: CoroutineScope = lifecycleScope,
@@ -53,14 +61,18 @@ abstract class BaseService : LifecycleService() {
             startForegroundNotification()
             isForeground = true
         }
-        return super.onStartCommand(intent, flags, startId)
+        // 返回 START_STICKY 确保服务被系统杀死后能重启
+        return Service.START_STICKY
     }
 
     @CallSuper
     override fun onTaskRemoved(rootIntent: Intent?) {
-        LogUtils.d(simpleName, "onTaskRemoved")
+        LogUtils.d(simpleName, "onTaskRemoved, stopOnTaskRemoved=$stopOnTaskRemoved")
         super.onTaskRemoved(rootIntent)
-        stopSelf()
+        // 对于需要后台驻留的服务（如朗读服务），不停止服务
+        if (stopOnTaskRemoved) {
+            stopSelf()
+        }
     }
 
     override fun onBind(intent: Intent): IBinder? {

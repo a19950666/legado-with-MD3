@@ -91,6 +91,13 @@ abstract class BaseReadAloudService : BaseService(),
 
     }
 
+    /**
+     * 朗读服务需要在任务移除时继续运行，以支持后台朗读和章节切换
+     * 这是为了解决在卓易通等环境下，朗读模式无法切换下一章节的问题
+     */
+    override val stopOnTaskRemoved: Boolean
+        get() = false
+
     private val useWakeLock = appCtx.getPrefBoolean(PreferKey.readAloudWakeLock, false)
     private val wakeLock by lazy {
         powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "legado:ReadAloudService")
