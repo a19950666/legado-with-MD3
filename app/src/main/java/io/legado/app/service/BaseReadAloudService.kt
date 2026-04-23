@@ -60,6 +60,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import splitties.systemservices.audioManager
 import splitties.systemservices.notificationManager
@@ -315,6 +316,23 @@ abstract class BaseReadAloudService : BaseService(),
         needResumeOnCallStateIdle = false
         upReadAloudNotification()
         postEvent(EventBus.ALOUD_STATE, Status.PLAY)
+    }
+
+    /**
+     * 更新朗读内容列表，用于章节切换后重新加载内容
+     */
+    private fun upContentList() {
+        textChapter = ReadBook.curTextChapter
+        val chapter = textChapter ?: return
+        if (!chapter.isCompleted) {
+            AppLog.put("朗读：章节布局未完成，等待...")
+            return
+        }
+        readAloudByPage = getPrefBoolean(PreferKey.readAloudByPage)
+        contentList = chapter.getNeedReadAloud(0, readAloudByPage, 0)
+            .split("\n")
+            .filter { it.isNotEmpty() }
+        AppLog.putDebug("朗读：更新内容列表，共 ${contentList.size} 段")
     }
 
     abstract fun playStop()
@@ -776,9 +794,32 @@ abstract class BaseReadAloudService : BaseService(),
     open fun nextChapter() {
         ReadBook.upReadTime()
         AppLog.putDebug("${ReadBook.curTextChapter?.chapter?.title} 朗读结束跳转下一章并朗读")
-        resumeReadAloudInternal()
-        if (!ReadBook.moveToNextChapter(true)) {
-            stopSelf()
+        // 使用 await 版本确保后台时也能正确加载章节
+        execute {
+            val success = ReadBook.moveToNextChapterAwait(true, upContentInPlace = false)
+            if (!success) {
+                AppLog.put("朗读：已到最后一章，停止服务")
+                withContext(Main) {
+                    stopSelf()
+                }
+            } else {
+                // 章节切换成功后，等待内容加载完成再开始朗读
+                delay(500)
+                // 重置朗读状态
+                nowSpeak = 0
+                readAloudNumber = 0
+                paragraphStartPos = 0
+                pageIndex = 0
+                // 更新内容列表
+                upContentList()
+                // 开始朗读新章节
+                withContext(Main) {
+                    resumeReadAloudInternal()
+                    play()
+                }
+            }
+        }.onError {
+            AppLog.put("朗读切换下一章出错: ${it.localizedMessage}", it)
         }
     }
 
