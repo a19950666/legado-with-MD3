@@ -233,12 +233,13 @@ class App : Application() {
         val readAloudChannel = NotificationChannel(
             channelIdReadAloud,
             getString(R.string.read_aloud),
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_LOW  // 使用 LOW 重要性，避免被系统杀后台
         ).apply {
             enableLights(false)
             enableVibration(false)
             setSound(null, null)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setShowBadge(false)
         }
 
         val webChannel = NotificationChannel(

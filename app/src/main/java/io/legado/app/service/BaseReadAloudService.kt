@@ -98,7 +98,8 @@ abstract class BaseReadAloudService : BaseService(),
     override val stopOnTaskRemoved: Boolean
         get() = false
 
-    private val useWakeLock = appCtx.getPrefBoolean(PreferKey.readAloudWakeLock, false)
+    // 强制启用 WakeLock 以确保后台运行，解决鸿蒙等系统的后台限制
+    private val useWakeLock = true // appCtx.getPrefBoolean(PreferKey.readAloudWakeLock, false)
     private val wakeLock by lazy {
         powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "legado:ReadAloudService")
             .apply {
@@ -150,6 +151,16 @@ abstract class BaseReadAloudService : BaseService(),
     @SuppressLint("WakelockTimeout")
     override fun onCreate() {
         super.onCreate()
+        // 服务创建时立即获取 WakeLock，防止被系统杀后台
+        if (useWakeLock) {
+            try {
+                wakeLock.acquire()
+                wifiLock?.acquire()
+                AppLog.put("朗读服务已获取 WakeLock")
+            } catch (e: Exception) {
+                AppLog.put("获取 WakeLock 失败: ${e.message}")
+            }
+        }
         isRun = true
         pause = false
         observeLiveBus()
@@ -297,10 +308,11 @@ abstract class BaseReadAloudService : BaseService(),
 
     @CallSuper
     open fun pauseReadAloud(abandonFocus: Boolean = true) {
-        if (useWakeLock) {
-            wakeLock.release()
-            wifiLock?.release()
-        }
+        // 暂停时不释放 WakeLock，保持后台运行
+        // if (useWakeLock) {
+        //     wakeLock.release()
+        //     wifiLock?.release()
+        // }
         pause = true
         if (abandonFocus) {
             abandonFocus()
@@ -315,9 +327,19 @@ abstract class BaseReadAloudService : BaseService(),
     @SuppressLint("WakelockTimeout")
     @CallSuper
     open fun resumeReadAloud() {
+        // 恢复时重新获取 WakeLock
+        if (useWakeLock) {
+            try {
+                wakeLock.acquire()
+                wifiLock?.acquire()
+            } catch (e: Exception) {
+                AppLog.put("获取 WakeLock 失败: ${e.message}")
+            }
+        }
         resumeReadAloudInternal()
     }
 
+    @SuppressLint("WakelockTimeout")
     private fun resumeReadAloudInternal() {
         pause = false
         needResumeOnAudioFocusGain = false
@@ -626,6 +648,8 @@ abstract class BaseReadAloudService : BaseService(),
             .setVibrate(null)
             .setSound(null)
             .setLights(0, 0, 0)
+            // 增加通知优先级，防止被系统杀后台
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
         builder.setLargeIcon(cover)
         // 按钮定义：上一章、播放、停止、下一章、定时
         builder.addAction(
