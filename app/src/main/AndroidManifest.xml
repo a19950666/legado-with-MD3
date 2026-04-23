@@ -492,14 +492,27 @@
             android:name=".service.TTSReadAloudService"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="io.legado.app.service.TTSReadAloudService" />
+            </intent-filter>
+        </service>
         <service
             android:name=".service.HttpReadAloudService"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="io.legado.app.service.HttpReadAloudService" />
+            </intent-filter>
+        </service>
         <service
             android:name=".service.AudioPlayService"
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false"
+            android:exported="false" />
+        <service
+            android:name=".service.ReadAloudGuardService"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false"
             android:exported="false" />

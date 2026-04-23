@@ -167,6 +167,8 @@ abstract class BaseReadAloudService : BaseService(),
                 AppLog.put("获取 WakeLock 失败: ${e.message}")
             }
         }
+        // 启动守护服务，适配卓易通等环境
+        ReadAloudGuardService.start(this)
         isRun = true
         pause = false
         observeLiveBus()
@@ -210,6 +212,8 @@ abstract class BaseReadAloudService : BaseService(),
 
     override fun onDestroy() {
         super.onDestroy()
+        // 停止守护服务
+        ReadAloudGuardService.stop(this)
         if (useWakeLock) {
             wakeLock.release()
             wifiLock?.release()

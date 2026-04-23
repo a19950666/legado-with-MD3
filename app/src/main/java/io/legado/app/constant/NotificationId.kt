@@ -15,5 +15,6 @@ object NotificationId {
     const val CheckSourceService = 107
     const val Download = 10000
     const val ExportBook = 201
+    const val ReadAloudGuard = 108
 
 }
