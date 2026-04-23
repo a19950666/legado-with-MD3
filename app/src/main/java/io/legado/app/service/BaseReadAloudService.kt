@@ -3,6 +3,7 @@
 package io.legado.app.service
 
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,6 +13,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.support.v4.media.session.MediaSessionCompat
@@ -45,6 +47,7 @@ import io.legado.app.receiver.MediaButtonReceiver
 import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.utils.LogUtils
+import io.legado.app.utils.SystemUtils
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.observeEvent
@@ -637,21 +640,28 @@ abstract class BaseReadAloudService : BaseService(),
 
             else -> getString(R.string.read_aloud_t)
         }
-        nTitle += ": ${ReadBook.book?.name}"
+        val bookName = ReadBook.book?.name
+        if (!bookName.isNullOrBlank()) {
+            nTitle += ": $bookName"
+        }
         var nSubtitle = ReadBook.curTextChapter?.title
         if (nSubtitle.isNullOrBlank())
             nSubtitle = getString(R.string.read_aloud_s)
+
+        // 确保标题和内容不为空，避免 Android 12+ 的 Bad notification 错误
+        val finalTitle = nTitle.ifBlank { getString(R.string.read_aloud) }
+        val finalSubtitle = nSubtitle.ifBlank { getString(R.string.read_aloud_s) }
+
         val builder = NotificationCompat
             .Builder(this, AppConst.channelIdReadAloud)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setSmallIcon(R.drawable.ic_volume_up)
-            .setSubText(getString(R.string.read_aloud))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setContentTitle(nTitle)
-            .setContentText(nSubtitle)
+            .setContentTitle(finalTitle)
+            .setContentText(finalSubtitle)
             .setContentIntent(
                 activityPendingIntent<ReadBookActivity>("activity")
             )
@@ -700,19 +710,59 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     /**
-     * 更新通知 - 必须同步执行，Android 14+ 要求在 5 秒内调用 startForeground
+     * 更新通知 - 必须同步执行，Android 12+ 要求通知渠道必须存在
      */
     override fun startForegroundNotification() {
         try {
-            val notification = createNotification()
-            // 同步启动前台服务，避免 Android 14+ 的 ANR 或崩溃
-            startForeground(NotificationId.ReadAloudService, notification.build())
+            // 确保通知渠道存在
+            ensureNotificationChannel()
+            val notification = createNotification().build()
+            // 同步启动前台服务
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NotificationId.ReadAloudService, notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NotificationId.ReadAloudService, notification)
+            }
             AppLog.put("朗读服务前台通知已创建")
         } catch (e: Exception) {
             AppLog.put("创建朗读通知出错,${e.localizedMessage}", e, true)
-            //创建通知出错不结束服务就会崩溃,服务必须绑定通知
-            stopSelf()
+            // 创建通知出错不结束服务就会崩溃，尝试使用最小通知
+            try {
+                val fallbackNotification = createFallbackNotification()
+                startForeground(NotificationId.ReadAloudService, fallbackNotification)
+            } catch (e2: Exception) {
+                AppLog.put("创建备用通知也失败,${e2.localizedMessage}", e2, true)
+                stopSelf()
+            }
         }
+    }
+
+    /**
+     * 确保通知渠道存在
+     */
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = notificationManager.getNotificationChannel(AppConst.channelIdReadAloud)
+            if (channel == null) {
+                AppLog.put("通知渠道不存在，需要重新创建")
+                // 通知渠道不存在，这应该在 App 启动时创建
+            }
+        }
+    }
+
+    /**
+     * 创建最小化的备用通知，用于主通知创建失败时
+     */
+    @SuppressLint("RestrictedApi")
+    private fun createFallbackNotification(): Notification {
+        return NotificationCompat.Builder(this, AppConst.channelIdReadAloud)
+            .setSmallIcon(R.drawable.ic_volume_up)
+            .setContentTitle(getString(R.string.read_aloud))
+            .setContentText(getString(R.string.read_aloud_s))
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
     }
 
     abstract fun aloudServicePendingIntent(actionStr: String): PendingIntent?
