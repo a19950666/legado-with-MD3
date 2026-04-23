@@ -98,6 +98,12 @@ abstract class BaseReadAloudService : BaseService(),
     override val stopOnTaskRemoved: Boolean
         get() = false
 
+    /**
+     * 服务被杀死后自动重启，适配卓易通等特殊环境
+     */
+    override val autoRestartOnKill: Boolean
+        get() = true
+
     // 强制启用 WakeLock 以确保后台运行，解决鸿蒙等系统的后台限制
     private val useWakeLock = true // appCtx.getPrefBoolean(PreferKey.readAloudWakeLock, false)
     private val wakeLock by lazy {

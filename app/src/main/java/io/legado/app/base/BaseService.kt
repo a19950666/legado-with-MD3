@@ -8,6 +8,7 @@ import androidx.annotation.CallSuper
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.help.LifecycleHelp
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -32,6 +33,13 @@ abstract class BaseService : LifecycleService() {
      */
     protected open val stopOnTaskRemoved: Boolean
         get() = true
+
+    /**
+     * 是否在服务被系统杀死后自动重启
+     * 子类可重写此属性
+     */
+    protected open val autoRestartOnKill: Boolean
+        get() = false
 
     fun <T> execute(
         scope: CoroutineScope = lifecycleScope,
@@ -72,6 +80,11 @@ abstract class BaseService : LifecycleService() {
         // 对于需要后台驻留的服务（如朗读服务），不停止服务
         if (stopOnTaskRemoved) {
             stopSelf()
+        } else if (autoRestartOnKill) {
+            // 卓易通等环境可能需要重启服务
+            AppLog.put("服务被移除，准备重启: $simpleName")
+            val intent = Intent(applicationContext, this::class.java)
+            applicationContext.startService(intent)
         }
     }
 
