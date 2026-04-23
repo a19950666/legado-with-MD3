@@ -231,7 +231,16 @@ class DownloadService : BaseService() {
             .setGroupSummary(true)
             .setOngoing(true)
             .build()
-        startForeground(NotificationId.DownloadService, notification)
+        // Android 10+ 需要指定 foregroundServiceType
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.DownloadService,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NotificationId.DownloadService, notification)
+        }
     }
 
     /**

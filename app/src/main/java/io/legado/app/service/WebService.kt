@@ -220,7 +220,16 @@ class WebService : BaseService() {
             servicePendingIntent<WebService>(IntentAction.stop)
         )
         val notification = builder.build()
-        startForeground(NotificationId.WebService, notification)
+        // Android 10+ 需要指定 foregroundServiceType
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.WebService,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NotificationId.WebService, notification)
+        }
     }
 
     @SuppressLint("ObsoleteSdkInt")

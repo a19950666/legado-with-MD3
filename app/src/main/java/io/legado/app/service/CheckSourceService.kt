@@ -255,7 +255,16 @@ class CheckSourceService : BaseService() {
         notificationBuilder.setContentText(notificationMsg)
         notificationBuilder.setProgress(originSize, finishCount, false)
         postEvent(EventBus.CHECK_SOURCE, notificationMsg)
-        startForeground(NotificationId.CheckSourceService, notificationBuilder.build())
+        // Android 10+ 需要指定 foregroundServiceType
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.CheckSourceService,
+                notificationBuilder.build(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NotificationId.CheckSourceService, notificationBuilder.build())
+        }
     }
 
 }

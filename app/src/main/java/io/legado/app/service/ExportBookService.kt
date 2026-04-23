@@ -139,7 +139,16 @@ class ExportBookService : BaseService() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setGroup(groupKey)
             .setGroupSummary(true)
-        startForeground(NotificationId.ExportBookService, notification.build())
+        // Android 10+ 需要指定 foregroundServiceType
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.ExportBookService,
+                notification.build(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NotificationId.ExportBookService, notification.build())
+        }
     }
 
     private fun upExportNotification(finish: Boolean = false) {

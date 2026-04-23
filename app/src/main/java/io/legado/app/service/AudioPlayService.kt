@@ -649,16 +649,42 @@ class AudioPlayService : BaseService(),
     }
 
     /**
-     * 更新通知
+     * 更新通知 - 必须同步执行，Android 12+ 要求在 5 秒内调用 startForeground
      */
     override fun startForegroundNotification() {
-        execute {
+        try {
+            val notification = createNotification().build()
+            // Android 10+ 需要指定 foregroundServiceType
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NotificationId.AudioPlayService,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                startForeground(NotificationId.AudioPlayService, notification)
+            }
+        } catch (e: Exception) {
+            AppLog.put("创建音频播放通知出错,${e.localizedMessage}", e, true)
+            // 创建通知出错时尝试使用最小通知
             try {
-                val notification = createNotification()
-                startForeground(NotificationId.AudioPlayService, notification.build())
-            } catch (e: Exception) {
-                AppLog.put("创建音频播放通知出错,${e.localizedMessage}", e, true)
-                //创建通知出错不结束服务就会崩溃,服务必须绑定通知
+                val fallbackNotification = NotificationCompat.Builder(this, AppConst.channelIdReadAloud)
+                    .setSmallIcon(R.drawable.ic_volume_up)
+                    .setContentTitle(getString(R.string.audio))
+                    .setContentText(getString(R.string.audio_play_s))
+                    .setOngoing(true)
+                    .build()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NotificationId.AudioPlayService,
+                        fallbackNotification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    startForeground(NotificationId.AudioPlayService, fallbackNotification)
+                }
+            } catch (e2: Exception) {
+                AppLog.put("创建备用通知也失败,${e2.localizedMessage}", e2, true)
                 stopSelf()
             }
         }

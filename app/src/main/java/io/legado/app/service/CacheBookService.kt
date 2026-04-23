@@ -220,7 +220,16 @@ class CacheBookService : BaseService() {
     override fun startForegroundNotification() {
         notificationBuilder.setContentText(notificationContent)
         val notification = notificationBuilder.build()
-        startForeground(NotificationId.CacheBookService, notification)
+        // Android 10+ 需要指定 foregroundServiceType
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.CacheBookService,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NotificationId.CacheBookService, notification)
+        }
     }
 
 }

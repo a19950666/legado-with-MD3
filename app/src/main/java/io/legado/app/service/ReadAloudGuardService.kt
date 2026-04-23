@@ -1,10 +1,13 @@
 package io.legado.app.service
 
-import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import io.legado.app.R
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.NotificationId
 import kotlinx.coroutines.CoroutineScope
@@ -33,13 +36,23 @@ class ReadAloudGuardService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // 启动前台服务
-        val notification = Notification.Builder(this)
-            .setContentTitle("朗读服务")
-            .setContentText("正在后台运行")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+        // 启动前台服务 - 使用 NotificationCompat 和正确的通知渠道
+        val notification = NotificationCompat.Builder(this, AppConst.channelIdReadAloud)
+            .setContentTitle(getString(R.string.read_aloud))
+            .setContentText(getString(R.string.read_aloud_s))
+            .setSmallIcon(R.drawable.ic_volume_up)
+            .setOngoing(true)
             .build()
-        startForeground(NotificationId.ReadAloudGuard, notification)
+        // Android 10+ 需要指定 foregroundServiceType
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NotificationId.ReadAloudGuard,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            startForeground(NotificationId.ReadAloudGuard, notification)
+        }
     }
 
     override fun onDestroy() {
